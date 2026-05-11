@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수질 오염 분류 AI — 분광 분석 머신러닝</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="shell">
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 12h8M12 8v8"/></svg>
+        </div>
+        <span class="logo-title">AquaClass AI</span>
+      </div>
+      <div class="logo-sub">수질 오염 분류 시스템</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-section">분석</div>
+      <button class="nav-item active" onclick="showPage('analyze')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        직접 입력 분류
+      </button>
+      <button class="nav-item" onclick="showPage('csv')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        CSV 파일 업로드
+      </button>
+      <div class="nav-section">기록 / 정보</div>
+      <button class="nav-item" onclick="showPage('history')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        측정 기록
+      </button>
+      <button class="nav-item" onclick="showPage('about')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        모델 정보
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="accuracy-badge">
+        <div class="acc-dot"></div>
+        <span>모델 정확도 95%+</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" id="topbar-title">직접 입력 분류</div>
+        <div class="page-sub">흡광도 값을 입력하고 오염 종류를 분류합니다</div>
+      </div>
+      <div class="status-pill">
+        <span class="pulse"></span>
+        랜덤 포레스트 모델 활성
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ════ PAGE: ANALYZE ════ -->
+      <div id="page-analyze" class="page-section active">
+        <div class="card">
+          <div class="card-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+            <h2>파장별 흡광도 입력</h2>
+            <span class="badge badge-info">400–700 nm · 7개 파장</span>
+          </div>
+          <div class="wl-grid" id="wl-grid">
+            <!-- JS로 생성 -->
+          </div>
+          <div class="spectrum-wrap">
+            <div class="spectrum-label">흡광도 스펙트럼 미리보기</div>
+            <canvas id="spectrum-canvas"></canvas>
+          </div>
+          <div class="preset-row">
+            <span style="font-size:12px;color:var(--text3);align-self:center;margin-right:4px">예시 →</span>
+            <button class="preset-btn p-clean" onclick="loadPreset(0)"><span class="dot"></span>깨끗한 물</button>
+            <button class="preset-btn p-organic" onclick="loadPreset(1)"><span class="dot"></span>유기물 오염</button>
+            <button class="preset-btn p-heavy" onclick="loadPreset(2)"><span class="dot"></span>중금속 오염</button>
+            <button class="preset-btn p-algae" onclick="loadPreset(3)"><span class="dot"></span>조류 오염</button>
+          </div>
+          <div class="action-row">
+            <button class="btn-primary" onclick="classify()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              오염 종류 분류하기
+            </button>
+            <button class="btn-ghost" onclick="resetAll()">초기화</button>
+          </div>
+        </div>
+
+        <div class="result-panel" id="result-panel">
+          <div class="result-top">
+            <div>
+              <div class="result-tag">분류 결과</div>
+              <div class="result-name" id="res-name">—</div>
+              <div class="result-conf" id="res-conf"></div>
+            </div>
+            <svg class="conf-ring" id="conf-ring" viewBox="0 0 72 72">
+              <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(99,140,210,0.15)" stroke-width="6"/>
+              <circle id="conf-arc" cx="36" cy="36" r="30" fill="none" stroke-width="6"
+                stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5"
+                transform="rotate(-90 36 36)" style="transition:stroke-dashoffset .6s ease"/>
+              <text id="conf-text" x="36" y="40" text-anchor="middle" font-size="14" font-weight="600" font-family="'IBM Plex Mono',monospace" fill="var(--text)">0%</text>
+            </svg>
+          </div>
+          <div class="prob-list" id="prob-list"></div>
+        </div>
+      </div>
+
+      <!-- ════ PAGE: CSV ════ -->
+      <div id="page-csv" class="page-section">
+        <div class="card">
+          <div class="card-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <h2>버니어 CSV 파일 업로드</h2>
+          </div>
+          <div class="upload-zone" id="upload-zone">
+            <input type="file" id="csv-file-input" accept=".csv" onchange="handleCSV(event)">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="upload-title">CSV 파일을 클릭하여 선택</div>
+            <div class="upload-sub">Vernier Spectral Analysis 앱에서 내보낸 파일</div>
+          </div>
+          <div class="csv-preview" id="csv-preview">
+            <div class="csv-row-label">추출된 흡광도 값</div>
+            <div class="wl-grid" id="csv-wl-display"></div>
+            <div class="spectrum-wrap" style="margin-bottom:0">
+              <div class="spectrum-label">스펙트럼</div>
+              <canvas id="csv-canvas"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="result-panel" id="csv-result-panel">
+          <div class="result-top">
+            <div>
+              <div class="result-tag">분류 결과</div>
+              <div class="result-name" id="csv-res-name">—</div>
+              <div class="result-conf" id="csv-res-conf"></div>
+            </div>
+            <svg class="conf-ring" viewBox="0 0 72 72">
+              <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(99,140,210,0.15)" stroke-width="6"/>
+              <circle id="csv-conf-arc" cx="36" cy="36" r="30" fill="none" stroke-width="6"
+                stroke-linecap="round" stroke-dasharray="188.5" stroke-dashoffset="188.5"
+                transform="rotate(-90 36 36)" style="transition:stroke-dashoffset .6s ease"/>
+              <text id="csv-conf-text" x="36" y="40" text-anchor="middle" font-size="14" font-weight="600" font-family="'IBM Plex Mono',monospace" fill="var(--text)">0%</text>
+            </svg>
+          </div>
+          <div class="prob-list" id="csv-prob-list"></div>
+        </div>
+      </div>
+
+      <!-- ════ PAGE: HISTORY ════ -->
+      <div id="page-history" class="page-section">
+        <div class="card">
+          <div class="card-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <h2>측정 기록</h2>
+            <button class="btn-ghost" onclick="clearHistory()" style="margin-left:auto;padding:5px 12px;font-size:12px">기록 삭제</button>
+          </div>
+          <div class="history-list" id="history-list">
+            <div class="empty-hist">
+              <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M9 9l3 3 4-4"/></svg>
+              아직 측정 기록이 없습니다
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════ PAGE: ABOUT ════ -->
+      <div id="page-about" class="page-section">
+        <div class="about-grid">
+          <div class="info-card">
+            <div class="info-title">모델 알고리즘</div>
+            <div class="info-val">Random Forest</div>
+            <div class="info-sub">결정 트리 100개 앙상블</div>
+          </div>
+          <div class="info-card">
+            <div class="info-title">테스트 정확도</div>
+            <div class="info-val" style="color:var(--clean)">95%+</div>
+            <div class="info-sub">5-폴드 교차검증 기준</div>
+          </div>
+          <div class="info-card">
+            <div class="info-title">학습 데이터</div>
+            <div class="info-val">200개</div>
+            <div class="info-sub">오염 종류별 50개 샘플</div>
+          </div>
+          <div class="info-card">
+            <div class="info-title">입력 특성</div>
+            <div class="info-val">7개</div>
+            <div class="info-sub">400–700nm 파장별 흡광도</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+            <h2>오염 종류별 흡광 특성</h2>
+          </div>
+          <div class="class-pills">
+            <div class="class-pill" style="background:var(--clean-bg)"><div class="pill-dot" style="background:var(--clean)"></div><span class="pill-name" style="color:var(--clean)">깨끗한 물</span><span class="pill-wl">전 파장 낮음 (0.02–0.05)</span></div>
+            <div class="class-pill" style="background:var(--organic-bg)"><div class="pill-dot" style="background:var(--organic)"></div><span class="pill-name" style="color:var(--organic)">유기물 오염</span><span class="pill-wl">400–450nm 단파장 흡수 ↑</span></div>
+            <div class="class-pill" style="background:var(--heavy-bg)"><div class="pill-dot" style="background:var(--heavy)"></div><span class="pill-name" style="color:var(--heavy)">중금속 오염</span><span class="pill-wl">500–550nm 중간 파장 흡수 ↑</span></div>
+            <div class="class-pill" style="background:var(--algae-bg)"><div class="pill-dot" style="background:var(--algae)"></div><span class="pill-name" style="color:var(--algae)">조류(녹조) 오염</span><span class="pill-wl">650–700nm 장파장 흡수 ↑ (엽록소 a)</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><rect x="7" y="13" width="3" height="7"/><rect x="12" y="9" width="3" height="11"/><rect x="17" y="5" width="3" height="15"/></svg>
+            <h2>파장별 중요도 (Feature Importance)</h2>
+          </div>
+          <div class="imp-bars" id="imp-bars"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2v-4M9 21H5a2 2 0 0 1-2-2v-4m0 0h18"/></svg>
+            <h2>모델 파라미터</h2>
+          </div>
+          <table class="spec-table">
+            <thead><tr><th>파라미터</th><th>값</th></tr></thead>
+            <tbody>
+              <tr><td>알고리즘</td><td>RandomForestClassifier</td></tr>
+              <tr><td>n_estimators</td><td>100</td></tr>
+              <tr><td>max_depth</td><td>10</td></tr>
+              <tr><td>전처리</td><td>StandardScaler</td></tr>
+              <tr><td>학습/테스트 분할</td><td>80% / 20%</td></tr>
+              <tr><td>분류 클래스</td><td>4개</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="js/script.js"></script>
+</body>
+</html>
